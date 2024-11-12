@@ -5,9 +5,6 @@ import {
     Button,
     Box,
     LinearProgress,
-    List,
-    ListItem,
-    ListItemText,
     TextField,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -17,7 +14,6 @@ import ExcelJS from 'exceljs';
 
 export default function Home() {
     const [selectedFiles, setSelectedFiles] = useState([]);
-    const [logs, setLogs] = useState([]);
     const [progress, setProgress] = useState(0);
     const [outputFile, setOutputFile] = useState(null);
     const [fileName, setFileName] = useState("Results"); // Tên file mặc định
@@ -27,7 +23,7 @@ export default function Home() {
             (file) => file.name.endsWith('.RPT')
         );
         setSelectedFiles(files);
-        setLogs((prev) => [...prev, `${files.length} files selected.`]);
+        alert(`${files.length} files selected.`);
     };
 
     const handleProcess = async () => {
@@ -36,7 +32,6 @@ export default function Home() {
             return;
         }
 
-        setLogs([]);
         setProgress(0);
         const outputData = [];
         const assignedEnergies = {
@@ -53,8 +48,6 @@ export default function Home() {
             outputData.push(result);
             setProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
         }
-
-        setLogs((prev) => [...prev, 'Processing complete. Generating Excel...']);
 
         // Thu thập tất cả các tiêu đề từ outputData
         const headersSet = new Set();
@@ -91,8 +84,7 @@ export default function Home() {
         });
         const url = URL.createObjectURL(blob);
         setOutputFile(url);
-
-        setLogs((prev) => [...prev, 'Excel file generated. You can download it below.']);
+        alert('Excel file generated. You can download it below.');
     };
 
     const processFile = (stt, content, assignedEnergies) => {
@@ -108,7 +100,6 @@ export default function Home() {
             if (line.startsWith('     Sample Title:')) {
                 sampleName = line.split(':')[1].trim();
                 results['Tên mẫu'] = sampleName;
-                setLogs((prev) => [...prev, `Processing Sample: ${sampleName}`]);
             }
 
             if (line.includes('IDENTIFIED NUCLIDES')) {
@@ -128,11 +119,6 @@ export default function Home() {
                     if (isFloat(energy.replace('*', ''))) {
                         const energyVal = parseFloat(energy.replace('*', ''));
                         currentNuclide = nuclide;
-
-                        setLogs((prev) => [
-                            ...prev,
-                            `Found Nuclide: ${currentNuclide} - Energy: ${energyVal} keV`,
-                        ]);
 
                         if (assignedEnergies[currentNuclide]) {
                             const assignedEnergy = assignedEnergies[currentNuclide];
@@ -159,7 +145,6 @@ export default function Home() {
             }
         }
 
-        setLogs((prev) => [...prev, `Results for file ${stt}: ${JSON.stringify(results)}`]);
         return results;
     };
 
@@ -207,17 +192,6 @@ export default function Home() {
                 <Typography variant="body2" color="textSecondary">
                     {progress}%
                 </Typography>
-            </Box>
-
-            <Box sx={{ my: 2 }}>
-                <Typography variant="h6">Logs:</Typography>
-                <List dense>
-                    {logs.map((log, index) => (
-                        <ListItem key={index}>
-                            <ListItemText primary={log} />
-                        </ListItem>
-                    ))}
-                </List> {/* Thêm thẻ đóng </List> */}
             </Box>
 
             {outputFile && (
