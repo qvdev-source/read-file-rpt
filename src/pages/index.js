@@ -56,12 +56,18 @@ export default function Home() {
 
         setLogs((prev) => [...prev, 'Processing complete. Generating Excel...']);
 
+        // Thu thập tất cả các tiêu đề từ outputData
+        const headersSet = new Set();
+        outputData.forEach((data) => {
+            Object.keys(data).forEach((key) => headersSet.add(key));
+        });
+        const headers = Array.from(headersSet);
+
         // Tạo workbook và worksheet
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Results');
 
         // Thêm hàng tiêu đề
-        const headers = Object.keys(outputData[0]);
         const headerRow = worksheet.addRow(headers);
 
         // Định dạng tiêu đề cho các cột đặc biệt
@@ -74,7 +80,8 @@ export default function Home() {
 
         // Thêm dữ liệu từ outputData vào các hàng
         outputData.forEach((data) => {
-            worksheet.addRow(Object.values(data));
+            const row = headers.map((header) => data[header] || '');
+            worksheet.addRow(row);
         });
 
         // Tạo Blob và tải file
@@ -138,7 +145,7 @@ export default function Home() {
                                     results[`SS, Bq/kg (${currentNuclide})`] = '';
                                 }
                             }
-                        } else if (!results[`${currentNuclide}, Bq/kg`]) {
+                        } else {
                             if (parseFloat(activity) >= 0 && parseFloat(uncertainty) >= 0) {
                                 results[`${currentNuclide}, Bq/kg`] = parseFloat(activity);
                                 results[`SS, Bq/kg (${currentNuclide})`] = parseFloat(uncertainty);
@@ -210,7 +217,7 @@ export default function Home() {
                             <ListItemText primary={log} />
                         </ListItem>
                     ))}
-                </List>
+                </List> {/* Thêm thẻ đóng </List> */}
             </Box>
 
             {outputFile && (
