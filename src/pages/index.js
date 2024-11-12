@@ -24,7 +24,7 @@ export default function Home() {
 
     const handleFileUpload = (e) => {
         const files = Array.from(e.target.files).filter(
-            (file) => file.name.startsWith('D') && file.name.endsWith('.RPT')
+            (file) => file.name.endsWith('.RPT')
         );
         setSelectedFiles(files);
         setLogs((prev) => [...prev, `${files.length} files selected.`]);
