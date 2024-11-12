@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Container,
     Typography,
@@ -18,8 +18,8 @@ export default function Home() {
     const [loginError, setLoginError] = useState('');
 
     // Tài khoản đăng nhập được cấp sẵn
-    const predefinedUsername = 'user123';
-    const predefinedPassword = 'password123';
+    const predefinedUsername = 'admin';
+    const predefinedPassword = 'admin';
 
     // Trạng thái của form đăng nhập
     const [username, setUsername] = useState('');
@@ -31,14 +31,34 @@ export default function Home() {
     const [outputFile, setOutputFile] = useState(null);
     const [fileName, setFileName] = useState('Results'); // Tên file mặc định
 
+    // Thêm bộ đếm thời gian tự động đăng xuất
+    useEffect(() => {
+        let logoutTimer;
+        if (isAuthenticated) {
+            // Bắt đầu bộ đếm thời gian 5 phút
+            logoutTimer = setTimeout(() => {
+                setIsAuthenticated(false);
+                alert('Bạn đã bị đăng xuất do không hoạt động trong 5 phút.');
+            }, 5 * 60 * 1000); // 5 phút = 5 * 60 * 1000 milliseconds
+        }
+        return () => {
+            // Xóa bộ đếm thời gian khi component unmount hoặc khi isAuthenticated thay đổi
+            if (logoutTimer) {
+                clearTimeout(logoutTimer);
+            }
+        };
+    }, [isAuthenticated]);
+
     // Xử lý đăng nhập
     const handleLogin = (e) => {
         e.preventDefault();
         if (username === predefinedUsername && password === predefinedPassword) {
             setIsAuthenticated(true);
             setLoginError('');
+            setUsername(''); // Xóa giá trị username sau khi đăng nhập
+            setPassword(''); // Xóa giá trị password sau khi đăng nhập
         } else {
-            setLoginError('Invalid username or password.');
+            setLoginError('Sai tên đăng nhập hoặc mật khẩu.');
         }
     };
 
@@ -48,13 +68,13 @@ export default function Home() {
             (file) => file.name.endsWith('.RPT')
         );
         setSelectedFiles(files);
-        alert(`${files.length} files selected.`);
+        alert(`${files.length} tệp được chọn.`);
     };
 
     // Xử lý quá trình xử lý file
     const handleProcess = async () => {
         if (selectedFiles.length === 0) {
-            alert('Please select files first!');
+            alert('Vui lòng chọn tệp trước!');
             return;
         }
 
@@ -110,11 +130,12 @@ export default function Home() {
         // Tạo Blob và tải file
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], {
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            type:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         });
         const url = URL.createObjectURL(blob);
         setOutputFile(url);
-        alert('Excel file generated. You can download it below.');
+        alert('File Excel đã được tạo. Bạn có thể tải xuống bên dưới.');
     };
 
     // Hàm xử lý từng file
