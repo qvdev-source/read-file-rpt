@@ -110,6 +110,103 @@ export default function Home() {
     // Hàm kiểm tra xem giá trị có phải là số thực không
     const isFloat = (value) => !isNaN(parseFloat(value)) && isFinite(value);
 
+    // Hàm chuyển đổi nuclide thành dạng chữ hoa chữ thường phù hợp
+    const capitalizeNuclide = (nuclide) => {
+        // Ví dụ: 'pb-210' -> 'Pb-210'
+        const parts = nuclide.split('-');
+        if (parts.length === 2) {
+            return (
+                parts[0].charAt(0).toUpperCase() +
+                parts[0].slice(1).toLowerCase() +
+                '-' +
+                parts[1]
+            );
+        }
+        return nuclide;
+    };
+
+    // Hàm xử lý từng file
+    const processFile = (stt, content, assignedEnergies) => {
+        let sampleName = '';
+        const results = { STT: stt, 'Tên mẫu': '' };
+        let currentNuclide = '';
+        let startReading = false;
+
+        const lines = content.split('\n');
+        for (const line of lines) {
+            if (line.startsWith('     Sample Title:')) {
+                sampleName = line.split(':')[1].trim();
+                results['Tên mẫu'] = sampleName;
+            }
+
+            if (line.includes('IDENTIFIED NUCLIDES')) {
+                startReading = true;
+                continue;
+            }
+
+            if (startReading) {
+                if (line.startsWith('       * = Energy')) {
+                    break;
+                }
+
+                const regex = /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/;
+                const match = line.match(regex);
+                if (match) {
+                    const [
+                        _,
+                        nuclide,
+                        confidence,
+                        energy,
+                        yield_,
+                        activity,
+                        uncertainty,
+                    ] = match;
+                    if (isFloat(energy.replace('*', ''))) {
+                        const energyVal = parseFloat(energy.replace('*', ''));
+                        currentNuclide = nuclide;
+
+                        // Chuẩn hóa nuclide thành chữ thường để so sánh
+                        const normalizedNuclide = currentNuclide.toLowerCase();
+
+                        if (assignedEnergies[normalizedNuclide]) {
+                            const assignedEnergy = assignedEnergies[normalizedNuclide];
+                            if (Math.abs(energyVal - assignedEnergy) < 1) {
+                                if (
+                                    parseFloat(activity) >= 0 &&
+                                    parseFloat(uncertainty) >= 0
+                                ) {
+                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
+                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
+                                        uncertainty
+                                    );
+                                } else {
+                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
+                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
+                                }
+                            }
+                        } else {
+                            // Nếu nuclide không có trong assignedEnergies, vẫn lưu trữ nếu dữ liệu hợp lệ
+                            if (
+                                parseFloat(activity) >= 0 &&
+                                parseFloat(uncertainty) >= 0
+                            ) {
+                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
+                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
+                                    uncertainty
+                                );
+                            } else {
+                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
+                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return results;
+    };
+
     // Xử lý quá trình xử lý file
     const handleProcess = async () => {
         if (selectedFiles.length === 0) {
@@ -128,13 +225,15 @@ export default function Home() {
             setProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
         }
 
-        // Extract unique nuclides
+        // Extract unique nuclides, bỏ qua các khóa bắt đầu bằng "SS,"
         const nuclidesSet = new Set();
         outputData.forEach((data) => {
             Object.keys(data).forEach((key) => {
-                const match = key.match(/^(.+?), Bq\/kg/);
-                if (match) {
-                    nuclidesSet.add(match[1].toLowerCase()); // Chuẩn hóa thành chữ thường
+                if (!key.startsWith('SS,')) { // Bỏ qua các khóa bắt đầu bằng "SS,"
+                    const match = key.match(/^(.+?), Bq\/kg/);
+                    if (match) {
+                        nuclidesSet.add(match[1].toLowerCase()); // Chuẩn hóa thành chữ thường
+                    }
                 }
             });
         });
@@ -266,103 +365,6 @@ export default function Home() {
         const url = URL.createObjectURL(blob);
         setOutputFile(url);
         alert('File Excel đã được tạo. Bạn có thể tải xuống bên dưới.');
-    };
-
-    // Hàm chuyển đổi nuclide thành dạng chữ hoa chữ thường phù hợp
-    const capitalizeNuclide = (nuclide) => {
-        // Ví dụ: 'pb-210' -> 'Pb-210'
-        const parts = nuclide.split('-');
-        if (parts.length === 2) {
-            return (
-                parts[0].charAt(0).toUpperCase() +
-                parts[0].slice(1).toLowerCase() +
-                '-' +
-                parts[1]
-            );
-        }
-        return nuclide;
-    };
-
-    // Hàm xử lý từng file
-    const processFile = (stt, content, assignedEnergies) => {
-        let sampleName = '';
-        const results = { STT: stt, 'Tên mẫu': '' };
-        let currentNuclide = '';
-        let startReading = false;
-
-        const lines = content.split('\n');
-        for (const line of lines) {
-            if (line.startsWith('     Sample Title:')) {
-                sampleName = line.split(':')[1].trim();
-                results['Tên mẫu'] = sampleName;
-            }
-
-            if (line.includes('IDENTIFIED NUCLIDES')) {
-                startReading = true;
-                continue;
-            }
-
-            if (startReading) {
-                if (line.startsWith('       * = Energy')) {
-                    break;
-                }
-
-                const regex = /^\s*(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/;
-                const match = line.match(regex);
-                if (match) {
-                    const [
-                        _,
-                        nuclide,
-                        confidence,
-                        energy,
-                        yield_,
-                        activity,
-                        uncertainty,
-                    ] = match;
-                    if (isFloat(energy.replace('*', ''))) {
-                        const energyVal = parseFloat(energy.replace('*', ''));
-                        currentNuclide = nuclide;
-
-                        // Chuẩn hóa nuclide thành chữ thường để so sánh
-                        const normalizedNuclide = currentNuclide.toLowerCase();
-
-                        if (assignedEnergies[normalizedNuclide]) {
-                            const assignedEnergy = assignedEnergies[normalizedNuclide];
-                            if (Math.abs(energyVal - assignedEnergy) < 1) {
-                                if (
-                                    parseFloat(activity) >= 0 &&
-                                    parseFloat(uncertainty) >= 0
-                                ) {
-                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
-                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
-                                        uncertainty
-                                    );
-                                } else {
-                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
-                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
-                                }
-                            }
-                        } else {
-                            // Nếu nuclide không có trong assignedEnergies, vẫn lưu trữ nếu dữ liệu hợp lệ
-                            if (
-                                parseFloat(activity) >= 0 &&
-                                parseFloat(uncertainty) >= 0
-                            ) {
-                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
-                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
-                                    uncertainty
-                                );
-                            } else {
-                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
-                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return results;
     };
 
     return (
