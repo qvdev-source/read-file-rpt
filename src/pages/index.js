@@ -6,11 +6,34 @@ import {
     Box,
     LinearProgress,
     TextField,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Paper,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import StartIcon from '@mui/icons-material/Start';
 import ExcelJS from 'exceljs';
+
+// Định nghĩa assignedEnergies với các khóa ở định dạng chữ thường
+const assignedEnergies = {
+    'pb-210': 46.54,
+    'pb-212': 238.63,
+    'pl-214': 609.31,
+    'ra-226': 186.21,
+    'tl-208': 583.19,
+    'pb-214': 351.92,
+    'bi-212': 727.17,
+    'ac-228': 911.6,
+    'k-40': 1460.81,
+    'cs-137': 661.65,
+    'i-131': 364.48,
+    'be-7': 477.59,
+};
 
 export default function Home() {
     // Trạng thái xác thực
@@ -71,6 +94,22 @@ export default function Home() {
         alert(`${files.length} tệp được chọn.`);
     };
 
+    // Hàm chuyển số cột thành chữ cái Excel (ví dụ: 1 -> 'A')
+    const getColumnLetter = (colNumber) => {
+        let dividend = colNumber;
+        let columnName = '';
+        let modulo;
+        while (dividend > 0) {
+            modulo = (dividend - 1) % 26;
+            columnName = String.fromCharCode(65 + modulo) + columnName;
+            dividend = Math.floor((dividend - modulo) / 26);
+        }
+        return columnName;
+    };
+
+    // Hàm kiểm tra xem giá trị có phải là số thực không
+    const isFloat = (value) => !isNaN(parseFloat(value)) && isFinite(value);
+
     // Xử lý quá trình xử lý file
     const handleProcess = async () => {
         if (selectedFiles.length === 0) {
@@ -80,12 +119,6 @@ export default function Home() {
 
         setProgress(0);
         const outputData = [];
-        const assignedEnergies = {
-            'Tl-208': 583,
-            'Pb-214': 295,
-            'K-40': 1461,
-            'Th-234': 63.29,
-        };
 
         for (let i = 0; i < selectedFiles.length; i++) {
             const file = selectedFiles[i];
@@ -95,37 +128,134 @@ export default function Home() {
             setProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
         }
 
-        // Thu thập tất cả các tiêu đề từ outputData
-        const headersSet = new Set();
+        // Extract unique nuclides
+        const nuclidesSet = new Set();
         outputData.forEach((data) => {
-            Object.keys(data).forEach((key) => headersSet.add(key));
+            Object.keys(data).forEach((key) => {
+                const match = key.match(/^(.+?), Bq\/kg/);
+                if (match) {
+                    nuclidesSet.add(match[1].toLowerCase()); // Chuẩn hóa thành chữ thường
+                }
+            });
         });
-        const headers = Array.from(headersSet);
+        const nuclides = Array.from(nuclidesSet).sort();
 
-        // Tạo workbook và worksheet
+        // Assign numbers to nuclides
+        const numberedNuclides = nuclides.map((nuclide, index) => ({
+            name: capitalizeNuclide(nuclide), // Hàm để giữ lại định dạng gốc nếu cần
+            number: index + 1,
+        }));
+
+        // Create workbook and worksheet
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Results');
 
-        // Thêm hàng tiêu đề
-        const headerRow = worksheet.addRow(headers);
+        // Define header rows
+        const headerRow1 = ['STT', 'Tên mẫu'];
+        const headerRow2 = ['', ''];
+        const headerRow3 = ['', ''];
 
-        // Định dạng tiêu đề cho các cột đặc biệt
-        headers.forEach((header, colIndex) => {
-            const cell = headerRow.getCell(colIndex + 1);
-            if (
-                !header.startsWith('SS') &&
-                !header.startsWith('STT') &&
-                !header.startsWith('Tên')
-            ) {
-                cell.font = { color: { argb: 'FFFF0000' } }; // Đặt màu đỏ cho tiêu đề
-            }
+        numberedNuclides.forEach(() => {
+            headerRow1.push(''); // Placeholder cho dòng 1 của nhóm
+            headerRow1.push('');
+            headerRow2.push(''); // Placeholder cho dòng 2 của nhóm
+            headerRow2.push('');
+            headerRow3.push('Hoạt độ');
+            headerRow3.push('Sai số');
         });
 
-        // Thêm dữ liệu từ outputData vào các hàng
+        // Thêm các dòng header vào worksheet
+        worksheet.addRow(headerRow1);
+        worksheet.addRow(headerRow2);
+        worksheet.addRow(headerRow3);
+
+        // Merge "STT" vertically qua 3 dòng
+        worksheet.mergeCells(`A1:A3`);
+        const sttCell = worksheet.getCell('A1');
+        sttCell.value = 'STT';
+        sttCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        sttCell.font = { bold: true };
+
+        // Merge "Tên mẫu" vertically qua 3 dòng
+        worksheet.mergeCells(`B1:B3`);
+        const tenMauCell = worksheet.getCell('B1');
+        tenMauCell.value = 'Tên mẫu';
+        tenMauCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        tenMauCell.font = { bold: true };
+
+        // Merge và thiết lập các nhóm cột
+        numberedNuclides.forEach((nuclide, index) => {
+            const startCol = 3 + index * 2;
+            const endCol = startCol + 1;
+            const startLetter = getColumnLetter(startCol);
+            const endLetter = getColumnLetter(endCol);
+
+            // Merge hai cột cho dòng 1 của nhóm
+            worksheet.mergeCells(`${startLetter}1:${endLetter}1`);
+            const groupHeader = `(${nuclide.number}) ${nuclide.name}`;
+            const cell = worksheet.getCell(`${startLetter}1`);
+            cell.value = groupHeader;
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.font = { bold: true };
+
+            // Thiết lập "Bq/kg khô" cho dòng 2, gộp qua hai cột và in nghiêng
+            worksheet.mergeCells(`${startLetter}2:${endLetter}2`);
+            const bqkgCell = worksheet.getCell(`${startLetter}2`);
+            bqkgCell.value = 'Bq/kg khô';
+            bqkgCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            bqkgCell.font = { italic: true };
+        });
+
+        // Điều chỉnh độ rộng cột (tùy chọn)
+        worksheet.columns.forEach((column) => {
+            column.width = 20;
+        });
+
+        // Áp dụng đường viền và căn giữa cho các ô header
+        const totalColumns = 2 + numberedNuclides.length * 2;
+        for (let i = 1; i <= 3; i++) {
+            for (let j = 1; j <= totalColumns; j++) {
+                const cell = worksheet.getCell(i, j);
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' },
+                };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            }
+        }
+
+        // Thêm dữ liệu vào các hàng tiếp theo
         outputData.forEach((data) => {
-            const row = headers.map((header) => data[header] || '');
+            const row = [];
+            // Push STT và Tên mẫu
+            row.push(data['STT']);
+            row.push(data['Tên mẫu']);
+            // Push dữ liệu cho từng nuclide
+            numberedNuclides.forEach((nuclide) => {
+                const activityKey = `${nuclide.name}, Bq/kg`;
+                const ssKey = `SS, Bq/kg (${nuclide.name})`;
+                row.push(data[activityKey] !== undefined ? data[activityKey] : '');
+                row.push(data[ssKey] !== undefined ? data[ssKey] : '');
+            });
             worksheet.addRow(row);
         });
+
+        // Áp dụng đường viền và căn giữa cho các ô dữ liệu
+        const lastRow = worksheet.lastRow.number;
+        for (let i = 4; i <= lastRow; i++) {
+            for (let j = 1; j <= totalColumns; j++) {
+                const cell = worksheet.getCell(i, j);
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' },
+                };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            }
+        }
 
         // Tạo Blob và tải file
         const buffer = await workbook.xlsx.writeBuffer();
@@ -138,14 +268,27 @@ export default function Home() {
         alert('File Excel đã được tạo. Bạn có thể tải xuống bên dưới.');
     };
 
+    // Hàm chuyển đổi nuclide thành dạng chữ hoa chữ thường phù hợp
+    const capitalizeNuclide = (nuclide) => {
+        // Ví dụ: 'pb-210' -> 'Pb-210'
+        const parts = nuclide.split('-');
+        if (parts.length === 2) {
+            return (
+                parts[0].charAt(0).toUpperCase() +
+                parts[0].slice(1).toLowerCase() +
+                '-' +
+                parts[1]
+            );
+        }
+        return nuclide;
+    };
+
     // Hàm xử lý từng file
     const processFile = (stt, content, assignedEnergies) => {
         let sampleName = '';
         const results = { STT: stt, 'Tên mẫu': '' };
         let currentNuclide = '';
         let startReading = false;
-
-        const isFloat = (value) => !isNaN(parseFloat(value));
 
         const lines = content.split('\n');
         for (const line of lines) {
@@ -180,34 +323,38 @@ export default function Home() {
                         const energyVal = parseFloat(energy.replace('*', ''));
                         currentNuclide = nuclide;
 
-                        if (assignedEnergies[currentNuclide]) {
-                            const assignedEnergy = assignedEnergies[currentNuclide];
+                        // Chuẩn hóa nuclide thành chữ thường để so sánh
+                        const normalizedNuclide = currentNuclide.toLowerCase();
+
+                        if (assignedEnergies[normalizedNuclide]) {
+                            const assignedEnergy = assignedEnergies[normalizedNuclide];
                             if (Math.abs(energyVal - assignedEnergy) < 1) {
                                 if (
                                     parseFloat(activity) >= 0 &&
                                     parseFloat(uncertainty) >= 0
                                 ) {
-                                    results[`${currentNuclide}, Bq/kg`] = parseFloat(activity);
-                                    results[`SS, Bq/kg (${currentNuclide})`] = parseFloat(
+                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
+                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
                                         uncertainty
                                     );
                                 } else {
-                                    results[`${currentNuclide}, Bq/kg`] = '';
-                                    results[`SS, Bq/kg (${currentNuclide})`] = '';
+                                    results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
+                                    results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
                                 }
                             }
                         } else {
+                            // Nếu nuclide không có trong assignedEnergies, vẫn lưu trữ nếu dữ liệu hợp lệ
                             if (
                                 parseFloat(activity) >= 0 &&
                                 parseFloat(uncertainty) >= 0
                             ) {
-                                results[`${currentNuclide}, Bq/kg`] = parseFloat(activity);
-                                results[`SS, Bq/kg (${currentNuclide})`] = parseFloat(
+                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = parseFloat(activity);
+                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = parseFloat(
                                     uncertainty
                                 );
                             } else {
-                                results[`${currentNuclide}, Bq/kg`] = '';
-                                results[`SS, Bq/kg (${currentNuclide})`] = '';
+                                results[`${capitalizeNuclide(normalizedNuclide)}, Bq/kg`] = '';
+                                results[`SS, Bq/kg (${capitalizeNuclide(normalizedNuclide)})`] = '';
                             }
                         }
                     }
@@ -270,6 +417,32 @@ export default function Home() {
                         Sample Processor
                     </Typography>
 
+                    {/* Bảng hiển thị assignedEnergies */}
+                    <Box sx={{ my: 4 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Assigned Energies
+                        </Typography>
+                        <TableContainer component={Paper}>
+                            <Table aria-label="assigned energies table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><strong>Chất</strong></TableCell>
+                                        <TableCell><strong>Năng lượng (keV)</strong></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {Object.entries(assignedEnergies).map(([nuclide, energy]) => (
+                                        <TableRow key={nuclide}>
+                                            <TableCell>{capitalizeNuclide(nuclide)}</TableCell>
+                                            <TableCell>{energy}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Box>
+
+                    {/* Nút chọn file */}
                     <Box sx={{ my: 2 }}>
                         <Button
                             variant="contained"
@@ -292,6 +465,7 @@ export default function Home() {
                         </Typography>
                     </Box>
 
+                    {/* Trường nhập tên file */}
                     <Box sx={{ my: 2 }}>
                         <TextField
                             label="Tên file"
@@ -302,6 +476,7 @@ export default function Home() {
                         />
                     </Box>
 
+                    {/* Nút bắt đầu xử lý */}
                     <Box sx={{ my: 2 }}>
                         <Button
                             variant="contained"
@@ -313,6 +488,7 @@ export default function Home() {
                         </Button>
                     </Box>
 
+                    {/* Thanh tiến trình */}
                     <Box sx={{ my: 2 }}>
                         <LinearProgress variant="determinate" value={progress} />
                         <Typography variant="body2" color="textSecondary">
@@ -320,6 +496,7 @@ export default function Home() {
                         </Typography>
                     </Box>
 
+                    {/* Nút tải xuống file Excel */}
                     {outputFile && (
                         <Box sx={{ my: 2 }}>
                             <Button
