@@ -29,7 +29,7 @@ export const processTemplateGammaVision = (stt, content, assignedEnergies) => {
             }
 
             // Stop processing if the line is empty
-            if (!line.trim()) {
+            if (line.trim().includes("# - All peaks for activity calculation had bad shape.")) {
                 break;
             }
 
