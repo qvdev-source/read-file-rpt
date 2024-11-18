@@ -34,7 +34,7 @@ export const processTemplateGammaVision = (stt, content, assignedEnergies) => {
             }
 
             // Clean the line and extract the data
-            const cleanLine = line.replace(/[#<*]/g, '').trim(); // Remove unwanted characters
+            const cleanLine = line.replace(/([A-Za-z0-9-]+)\s+[^0-9]+([\d.+-eE]+)/, '$1 $2').trim(); // Remove unwanted characters
             // Updated regex to handle names like U-235
             const regex = /^([\w-]+)\s+([\d.+-eE]+)\s+\S+\s+([\d.+-eE]+)$/;
             const match = cleanLine.match(regex);
