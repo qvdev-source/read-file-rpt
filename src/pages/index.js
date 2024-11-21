@@ -139,7 +139,7 @@ const Home = () => {
     const assignedEnergies = {
         'pb-210': 46.54,
         'pb-212': 238.63,
-        'pl-214': 609.31,
+        'bi-214': 609.31, // Đã sửa từ 'pl-214' thành 'bi-214'
         'ra-226': 186.21,
         'tl-208': 583.19,
         'pb-214': 351.92,
@@ -150,6 +150,7 @@ const Home = () => {
         'i-131': 364.48,
         'be-7': 477.59,
     };
+
 
     return (
         <Container maxWidth="md" sx={{ mt: 5 }}>
